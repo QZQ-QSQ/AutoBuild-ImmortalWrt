@@ -1,0 +1,21 @@
+    - name: 个性化设置
+      run: |
+        cd openwrt
+        
+        sed -i 's/192.168.1.1/${{ github.event.inputs.default_ip }}/g' package/base-files/files/bin/config_generate
+        
+        if [ -n "${{ github.event.inputs.hostname }}" ]; then
+          sed -i "s/hostname='OpenWrt'/hostname='${{ github.event.inputs.hostname }}'/g" package/base-files/files/bin/config_generate
+        fi
+        
+        if [ -n "${{ github.event.inputs.default_password }}" ]; then
+          PWD_HASH=$(openssl passwd -1 "${{ github.event.inputs.default_password }}")
+          sed -i "s|root::0:0:99999:7:::|root:${PWD_HASH}:0:0:99999:7:::|g" package/base-files/files/etc/shadow
+        fi
+        
+        sed -i "s/timezone='UTC'/timezone='${{ github.event.inputs.timezone }}'/g" package/base-files/files/bin/config_generate
+        
+        mkdir -p files/etc/uci-defaults
+        # 修正：用printf替代cat + EOF，避免YAML解析EOF时的语法冲突
+        printf '#!/bin/sh\nuci set system.@system[0].zonename='\''${{ github.event.inputs.timezone }}'\''\nuci set system.@system[0].timezone='\''CST-8'\''\nuci commit system\n' > files/etc/uci-defaults/99-custom
+        chmod +x files/etc/uci-defaults/99-custom
